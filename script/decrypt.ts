@@ -1,8 +1,8 @@
 // src/decrypt.ts
-import * as fs from 'fs';
-import * as path from 'path';
-import * as crypto from 'crypto';
-import * as dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -18,14 +18,24 @@ if (key.length !== 32 || iv.length !== 16) {
 }
 
 if (!fs.existsSync(OUTPUT_DIR)) {
-  fs.mkdirSync(OUTPUT_DIR);
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 }
 
-function decryptFile(inputPath: string, outputPath: string) {
-  const data = fs.readFileSync(inputPath);
+// テキストファイルとして出力する拡張子（他はバイナリ）
+const TEXT_EXTENSIONS = ['.svg'];
+
+function decryptFile(inputPath: string, outputPath: string, isText: boolean) {
+  const encrypted = fs.readFileSync(inputPath);
+
   const decipher = crypto.createDecipheriv(algorithm, key, iv);
-  const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
-  fs.writeFileSync(outputPath, decrypted);
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+
+  if (isText) {
+    fs.writeFileSync(outputPath, decrypted.toString('utf-8'), 'utf-8');
+  } else {
+    fs.writeFileSync(outputPath, decrypted);
+  }
+
   console.log(`🔓 Decrypted: ${inputPath} → ${outputPath}`);
 }
 
@@ -33,9 +43,12 @@ fs.readdirSync(INPUT_DIR)
   .filter(file => file.endsWith('.enc'))
   .forEach(file => {
     const inputPath = path.join(INPUT_DIR, file);
-    const outputFileName = file.replace(/\.enc$/, '');
-    const outputPath = path.join(OUTPUT_DIR, outputFileName);
-    decryptFile(inputPath, outputPath);
+    const originalFileName = file.replace(/\.enc$/, '');
+    const ext = path.extname(originalFileName).toLowerCase();
+    const isText = TEXT_EXTENSIONS.includes(ext);
+
+    const outputPath = path.join(OUTPUT_DIR, originalFileName);
+    decryptFile(inputPath, outputPath, isText);
   });
 
 console.log('✅ All files decrypted.');
